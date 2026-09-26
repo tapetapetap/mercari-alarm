@@ -1,0 +1,9 @@
+{
+  "name": "메르카리 알림",
+  "short_name": "메르카리 알림",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e8453c",
+  "theme_color": "#e8453c",
+  "icons": [{ "src": "/icon.png", "sizes": "192x192", "type": "image/png" }]
+}
