@@ -29,7 +29,7 @@
 
 **Constraints**: 추가 비용 0, 게임 체감 영향 없음(메모리 수십 MB, 대부분 sleep), 관리 화면 인터넷 비노출
 
-**Scale/Scope**: 사용자 1명, 키워드 ≤ 20, 파이썬 파일 3개 + 테스트 1개 + 정적 파일 3개
+**Scale/Scope**: 사용자 1명, 키워드 ≤ 20, 파이썬 파일 2개 + 테스트 1개 + 정적 파일 3개
 
 ## Constitution Check
 
@@ -65,10 +65,9 @@ specs/001-keyword-alarm/
 ### Source Code (repository root)
 
 ```text
-alarm.py          # 진입점: .env 로드, 로깅, 조회 루프(스레드), 새 상품 판정, ntfy 전송, 고장 감지,
-                  #         키워드 파일·state 읽기/쓰기, 웹 서버 기동
+alarm.py          # 진입점: .env 로드, 로깅, 조회 루프, 새 상품 판정, 번역, ntfy 전송, 고장 감지,
+                  #         키워드 파일·state 읽기/쓰기, 관리 웹 핸들러(ThreadingHTTPServer)
 mercari.py        # search(keyword) -> list[Item]  — 메르카리 조회 방식을 아는 유일한 파일 (DPoP 포함)
-web.py            # ThreadingHTTPServer 핸들러: 정적 파일 + /api/keywords (alarm.py의 키워드 함수 사용)
 static/
 ├── index.html    # 관리 화면 (인라인 CSS/JS)
 ├── manifest.json
@@ -78,14 +77,15 @@ requirements.txt  # cryptography
 .env.example      # NTFY_TOPIC=, NTFY_SERVER=https://ntfy.sh, PORT=8787
 ```
 
-**Structure Decision**: 패키지·`src/` 없이 루트 평면 구조. 파일을 나누는 기준은 constitution III(조회 격리)와
-웹 핸들러 분리뿐이다. 판정·고장 감지는 `alarm.py` 안의 순수 함수로 두어 테스트가 직접 import 한다.
+**Structure Decision**: 패키지·`src/` 없이 루트 평면 구조. 파일을 나누는 기준은 constitution III(조회 격리)뿐이다.
+웹 핸들러는 처음에 `web.py`로 나눌 계획이었으나 구현 중 `alarm.py`에 합쳤다: `py alarm.py`로 실행하면 모듈이
+`__main__`으로 올라가는데 `web.py`가 `import alarm`을 하면 모듈이 두 벌 생겨 파일 락이 갈라진다. 판정·고장 감지는 `alarm.py` 안의 순수 함수로 두어 테스트가 직접 import 한다.
 
 ### 핵심 함수 (alarm.py)
 
 | 함수 | 역할 | 테스트 |
 |---|---|---|
-| `decide(state, items, now) -> (notify, overflow, old_bump, saturated)` | 새 상품 판정 + 조회 창 포화 감지 (data-model 규칙) | ✅ |
+| `decide(state, items, now) -> (state, fresh, saturated)` | 새 상품 판정 + 조회 창 포화 감지 (data-model 규칙) | ✅ |
 | `validate_keyword(raw, existing) -> str` | 정규화·검증, 실패 시 `ValueError(메시지)` | ✅ |
 | `FailureWatch.should_alert(now) / ok(now) / alerted()` | 고장 감지 | ✅ |
 | `run_cycle()` | 키워드별 search → decide → notify → state 저장 (키워드별 try/except) | 수동 |
