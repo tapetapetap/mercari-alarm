@@ -41,7 +41,7 @@
 | II. 단순함 우선 | 의존성 `cryptography` 1개(근거: R3). 프레임워크·DB 없음. 파일 최소 | ✅ |
 | III. 조회 계층 분리 | `mercari.search(keyword) -> list[Item]` 하나로 격리 ([contract](./contracts/mercari-search.md)) | ✅ |
 | IV. 조용한 실패 금지 | 로그 파일 + 10분 연속 실패 경고 + 키워드별 예외 격리 | ✅ |
-| V. 비밀·노출 관리 | 토픽 `.env`(gitignore), 포트포워딩 금지·방화벽 개인 프로필, 입력 검증·`textContent`, JSON Content-Type으로 CSRF 완화 | ✅ |
+| V. 비밀·노출 관리 | 토픽 `.env`(gitignore), 포트포워딩 금지·방화벽 포트 규칙(LAN·Tailscale만)·Host 검사, 입력 검증·`textContent`, JSON Content-Type으로 CSRF 완화 | ✅ |
 | VI. 핵심 로직 최소 테스트 | 판정·묶음·고장 감지·키워드 검증을 `test_alarm.py`로 | ✅ |
 
 Phase 1 설계 후 재확인: 위반 없음. Complexity Tracking 불필요.
