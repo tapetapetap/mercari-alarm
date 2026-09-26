@@ -64,6 +64,7 @@ unseen   = [i for i in items if i.id not in seen]
 new      = [i for i in unseen if i.created >= since - 60]     # 목록 순서(최신 갱신 먼저) 유지
 old_bump = unseen - new                                       # 알리지 않고 seen에만 추가
 개별 알림 = new[:5], 묶음 알림 = len(new) - 5 (> 0일 때만)
+포화     = state가 있고 len(items) > 0 이며 모든 item이 unseen   # 1분 사이 120건 넘게 갱신 → 놓쳤을 수 있음, 로그 경고
 seen에 추가 = old_bump + 전송 성공한 개별 알림 상품 + (묶음 전송 성공 시) new[5:]
 ```
 

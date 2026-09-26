@@ -49,7 +49,7 @@
 
 - [ ] T007 [P] [US1] `test_alarm.py`에 `decide()` 테스트: (a) state 없음 → 알림 0, 전체 `seen` 등록·`since=now`,
   (b) 미확인 + `created ≥ since-60` → 알림, (c) 미확인 + `created < since-60` → 알림 없이 `old_bump`,
-  (d) 이미 `seen` → 무시, (e) 새 상품 8개 → 개별 5 + `overflow=3`, 순서는 목록 순서 유지
+  (d) 이미 `seen` → 무시, (e) 새 상품 8개 → 개별 5 + `overflow=3`, 순서는 목록 순서 유지, (f) 결과 전부 미확인이면 포화 플래그 True
 
 ### Implementation for User Story 1
 
@@ -58,10 +58,10 @@
   `POST https://api.mercari.jp/v2/entities:search`, 본문·헤더는 research R1 그대로(`pageSize:120`, `SORT_CREATED_TIME`,
   `ORDER_DESC`, `STATUS_ON_SALE`, 두 데이터셋), 타임아웃 15초, 실패·형식 이상은 예외,
   Shops(`ITEM_TYPE_BEYOND`)는 `https://jp.mercari.com/shops/product/<id>` ([contracts/mercari-search.md](./contracts/mercari-search.md))
-- [ ] T009 [US1] `alarm.py`에 `decide(state, items, now) -> (notify, overflow, old_bump)` 순수 함수 (data-model "새 상품 판정 규칙"), T007 통과
+- [ ] T009 [US1] `alarm.py`에 `decide(state, items, now) -> (notify, overflow, old_bump, saturated)` 순수 함수 (data-model "새 상품 판정 규칙"), T007 통과
 - [ ] T010 [US1] `alarm.py`에 `run_cycle()`: 키워드마다 `search` → `decide` → 개별 `notify`(본문 `상품명\n¥12,345`, click=상품 URL)
   → `overflow>0`이면 묶음 `notify`(click=키워드 검색 URL, data-model 표) → 전송 성공분 + `old_bump`만 `seen`에 추가,
-  `SEEN_LIMIT` 초과분 앞에서 제거, 키워드 사이 `GAP`초, **키워드별 try/except**로 실패는 로그만(FR-019),
+  `SEEN_LIMIT` 초과분 앞에서 제거, 조회 결과 120개가 **전부** 미확인이면(창 포화 = 놓친 상품이 있을 수 있음) 로그에 경고(constitution IV), 키워드 사이 `GAP`초, **키워드별 try/except**로 실패는 로그만(FR-019),
   `keywords.txt`에 없는 키워드의 state 삭제(FR-015), 끝나면 `save_state`
 - [ ] T011 [US1] `alarm.py`에 `main()`: 설정 로드(토픽 없으면 로그 후 종료), 조회 루프(주기 시작 기준 `INTERVAL`마다 `run_cycle`,
   루프 전체 예외도 잡아 로그 후 계속), `if __name__ == "__main__"`

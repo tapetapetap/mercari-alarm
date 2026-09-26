@@ -85,7 +85,7 @@ requirements.txt  # cryptography
 
 | 함수 | 역할 | 테스트 |
 |---|---|---|
-| `decide(state, items, now) -> (notify, overflow, old_bump)` | 새 상품 판정 (data-model 규칙) | ✅ |
+| `decide(state, items, now) -> (notify, overflow, old_bump, saturated)` | 새 상품 판정 + 조회 창 포화 감지 (data-model 규칙) | ✅ |
 | `validate_keyword(raw, existing) -> str` | 정규화·검증, 실패 시 `ValueError(메시지)` | ✅ |
 | `FailureWatch.should_alert(now) / ok(now) / alerted()` | 고장 감지 | ✅ |
 | `run_cycle()` | 키워드별 search → decide → notify → state 저장 (키워드별 try/except) | 수동 |
