@@ -32,6 +32,7 @@
 - [ ] T005 `alarm.py`에 파일 입출력: `load_keywords()`(UTF-8, 공백 제거, 빈 줄 무시, 규칙 위반 줄은 로그 경고 후 제외),
   `save_keywords(list)`, `load_state()`/`save_state(dict)` — 쓰기는 임시 파일 + `os.replace`, 모듈 전역 `threading.Lock` 하나로 보호
   ([data-model.md](./data-model.md))
+- [ ] T006a `alarm.py`에 `translate(text) -> str | None`: research R4a 주소, 타임아웃 5초, 모든 예외는 로그 후 `None`
 - [ ] T006 `alarm.py`에 `notify(title, message, click=None)`: `POST {NTFY_SERVER}/`에 JSON `{topic,title,message,click}`,
   `urllib.request`, 타임아웃 10초, 실패 시 예외 (research R4)
 
@@ -49,7 +50,7 @@
 
 - [ ] T007 [P] [US1] `test_alarm.py`에 `decide()` 테스트: (a) state 없음 → 알림 0, 전체 `seen` 등록·`since=now`,
   (b) 미확인 + `created ≥ since-60` → 알림, (c) 미확인 + `created < since-60` → 알림 없이 `old_bump`,
-  (d) 이미 `seen` → 무시, (e) 새 상품 8개 → 개별 5 + `overflow=3`, 순서는 목록 순서 유지, (f) 결과 전부 미확인이면 포화 플래그 True
+  (d) 이미 `seen` → 무시, (e) 새 상품 8개 → 개별 5 + `overflow=3`, 순서는 목록 순서 유지, (f) 결과 전부 미확인이면 포화 플래그 True, (g) `item_message()`: 번역 있으면 `번역\n¥12,800\n(원문)`, `None`이면 `원문\n¥12,800`, 가격은 천 단위 쉼표
 
 ### Implementation for User Story 1
 
@@ -59,7 +60,7 @@
   `ORDER_DESC`, `STATUS_ON_SALE`, 두 데이터셋), 타임아웃 15초, 실패·형식 이상은 예외,
   Shops(`ITEM_TYPE_BEYOND`)는 `https://jp.mercari.com/shops/product/<id>` ([contracts/mercari-search.md](./contracts/mercari-search.md))
 - [ ] T009 [US1] `alarm.py`에 `decide(state, items, now) -> (notify, overflow, old_bump, saturated)` 순수 함수 (data-model "새 상품 판정 규칙"), T007 통과
-- [ ] T010 [US1] `alarm.py`에 `run_cycle()`: 키워드마다 `search` → `decide` → 개별 `notify`(본문 `상품명\n¥12,345`, click=상품 URL)
+- [ ] T010 [US1] `alarm.py`에 `run_cycle()`: 키워드마다 `search` → `decide` → 개별 상품마다 `translate(name)` → `item_message()`로 본문 조립 → `notify`(click=상품 URL)
   → `overflow>0`이면 묶음 `notify`(click=키워드 검색 URL, data-model 표) → 전송 성공분 + `old_bump`만 `seen`에 추가,
   `SEEN_LIMIT` 초과분 앞에서 제거, 조회 결과 120개가 **전부** 미확인이면(창 포화 = 놓친 상품이 있을 수 있음) 로그에 경고(constitution IV), 키워드 사이 `GAP`초, **키워드별 try/except**로 실패는 로그만(FR-019),
   `keywords.txt`에 없는 키워드의 state 삭제(FR-015), 끝나면 `save_state`

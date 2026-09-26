@@ -44,6 +44,14 @@ Phase 0. Technical Context의 미정 사항을 정리한다. 메르카리 조회
   `click` URL을 누르면 폰 기본 동작으로 링크가 열린다.
 - 토픽은 `.env`의 `NTFY_TOPIC`(무작위 문자열), 서버는 `NTFY_SERVER`(기본 `https://ntfy.sh`).
 
+## R4a. 상품명 번역
+
+- **Decision**: `GET https://translate.googleapis.com/translate_a/single?client=gtx&sl=ja&tl=ko&dt=t&q=<상품명>`
+  (`urllib.request`, 타임아웃 5초). 응답 `d[0][*][0]`을 이어 붙인 것이 번역문. 실패·형식 이상이면 `None` → 원문만 표시.
+- **확인**(2026-09-26): `ポケモンカード151 BOX シュリンク付き 未開封` → `포켓몬 카드 151 BOX 슈링크 첨부 미개봉`.
+- **Rationale**: 가입·키·설치 없음. 월 약 12만 자 수준이라 부담 없음.
+- **Alternatives**: DeepL API Free(가입·카드 인증), Google Cloud Translation(결제 계정), 로컬 번역 모델(수백 MB, 과함).
+
 ## R5. 관리 화면 서버
 
 - **Decision**: 표준 라이브러리 `http.server.ThreadingHTTPServer`를 조회 루프와 같은 프로세스의 별도 스레드로 띄운다.

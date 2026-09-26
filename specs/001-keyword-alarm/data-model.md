@@ -72,7 +72,7 @@ seen에 추가 = old_bump + 전송 성공한 개별 알림 상품 + (묶음 전�
 
 | 종류 | title | message | click |
 |---|---|---|---|
-| 새 상품 | 키워드 | `상품명\n¥12,345` | 상품 URL |
+| 새 상품 | 키워드 | `번역 상품명\n¥12,345\n(원문 상품명)` — 번역 실패 시 `원문 상품명\n¥12,345` | 상품 URL |
 | 묶음 | 키워드 | `외 N건의 새 상품` | 키워드 검색 URL(`https://jp.mercari.com/search?keyword=<인코딩>&sort=created_time&order=desc&status=on_sale`) |
 | 고장 경고 | `알림기 조회 실패 중` | `N분째 메르카리 조회가 실패하고 있습니다. alarm.log를 확인하세요.` | 없음 |
 

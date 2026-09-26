@@ -7,7 +7,7 @@
 ## Summary
 
 집 Windows PC에서 도는 Python 프로세스 하나. 조회 스레드가 1분마다 키워드별로 메르카리 내부 검색 API를
-호출해 "키워드 등록 이후 등록된, 아직 본 적 없는" 판매 중 상품을 ntfy로 푸시한다. 같은 프로세스의 웹 스레드가
+호출해 "키워드 등록 이후 등록된, 아직 본 적 없는" 판매 중 상품을 상품명 한국어 번역(원문 병기)과 함께 ntfy로 푸시한다. 같은 프로세스의 웹 스레드가
 키워드 관리 화면(PWA)과 JSON API를 제공하고, 폰은 Tailscale로 접속한다. 10분 연속 조회 실패 시 경고 푸시.
 
 ## Technical Context
@@ -89,6 +89,8 @@ requirements.txt  # cryptography
 | `validate_keyword(raw, existing) -> str` | 정규화·검증, 실패 시 `ValueError(메시지)` | ✅ |
 | `FailureWatch.should_alert(now) / ok(now) / alerted()` | 고장 감지 | ✅ |
 | `run_cycle()` | 키워드별 search → decide → notify → state 저장 (키워드별 try/except) | 수동 |
+| `translate(text) -> str \| None` | Google 번역 비공식 주소, 실패 시 None (research R4a) | 수동 |
+| `item_message(item, translated) -> str` | 알림 본문 조립 (번역 유무 분기) | ✅ |
 | `notify(title, message, click)` | ntfy JSON POST, 실패 시 예외 | 수동 |
 
 ## Complexity Tracking
