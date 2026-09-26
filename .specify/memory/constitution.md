@@ -1,14 +1,17 @@
 <!--
 Sync Impact Report
-- Version: (template) → 1.0.0 (최초 제정)
+- Version: 1.0.0 → 1.0.1 (PATCH: 원칙 VI 필수 테스트 목록에 키워드 입력 검증 명시, 보고서 정정)
+- 1.0.0: (template) → 1.0.0 최초 제정
 - Principles: I. intent.md 우선 / II. 단순함 우선 / III. 조회 계층 분리 /
   IV. 조용한 실패 금지 / V. 비밀·노출 관리 / VI. 핵심 로직 최소 테스트
-- Added sections: 대상 환경·기술 제약, 개발 워크플로, Governance
+- Added sections: 대상 환경·기술 제약, 개발 워크플로 (Governance는 템플릿의 기존 섹션에 내용만 채움)
 - Removed sections: 없음
 - Templates:
   ✅ .specify/templates/tasks-template.md — "Tests OPTIONAL" 문구에 원칙 VI 예외 명시
   ✅ .specify/templates/plan-template.md — Constitution Check가 이 파일을 참조하므로 변경 불필요
   ✅ .specify/templates/spec-template.md — 필수 섹션 변경 없음
+  ⚠ .claude/skills/speckit-tasks/SKILL.md — "테스트는 요청 시에만" 규칙 그대로. spec-kit이 관리하는 파일이라
+    수정하지 않는다(업그레이드 시 덮어써짐). 스킬이 이 헌법을 읽으므로 원칙 VI가 우선 적용된다.
 - Deferred TODOs: 없음
 -->
 
@@ -67,7 +70,7 @@ Sync Impact Report
 ### VI. 핵심 로직 최소 테스트
 
 - 분기가 있는 핵심 로직(새 상품 판별, 신규 키워드 첫 조회 무알림, 5건 초과 묶음,
-  연속 실패 판정, 키워드 추가·삭제)은 실행 가능한 테스트를 하나 이상 남긴다(MUST).
+  연속 실패 판정, 키워드 입력 검증·추가·삭제)은 실행 가능한 테스트를 하나 이상 남긴다(MUST).
 - 테스트는 표준 라이브러리(`unittest`)로 쓰고, 네트워크 없이 돌아야 한다(MUST).
   메르카리·ntfy 실호출 확인은 수동 점검으로 한다.
 - 단순 한 줄 코드에는 테스트를 만들지 않는다.
@@ -97,4 +100,4 @@ Sync Impact Report
 - 준수 확인: plan의 Constitution Check와 PR 리뷰에서 원칙 I~VI 위반 여부를 확인한다.
   위반이 불가피하면 plan의 Complexity Tracking에 근거를 적는다.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-26
+**Version**: 1.0.1 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-26
