@@ -1,3 +1,8 @@
 .DS_Store
 .env
 .env.*
+keywords.txt
+state.json
+alarm.log*
+__pycache__/
+!.env.example
