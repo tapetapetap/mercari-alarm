@@ -65,7 +65,7 @@ def search(keyword):
     }
     req = urllib.request.Request(URL, data=json.dumps(body).encode(), method="POST", headers={
         "DPoP": _dpop(), "X-Platform": "web", "Content-Type": "application/json",
-        "Accept": "application/json", "User-Agent": "Mozilla/5.0",
+        "User-Agent": "Mozilla/5.0",
     })
     with urllib.request.urlopen(req, timeout=15) as res:
         data = json.load(res)

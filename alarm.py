@@ -129,8 +129,7 @@ def decide(state, items, now):
     unseen = [i for i in items if i.id not in seen]
     # 신상품순은 실제로 "최근 수정순"이라 가격 수정된 옛 상품도 올라온다 → 등록 시각으로 거른다
     fresh = [i for i in unseen if i.created >= state["since"] - CLOCK_SLACK]
-    fresh_ids = {i.id for i in fresh}
-    bumped = [i.id for i in unseen if i.id not in fresh_ids]
+    bumped = [i.id for i in unseen if i not in fresh]
     saturated = bool(items) and len(unseen) == len(items)
     return {"since": state["since"], "seen": (state["seen"] + bumped)[-SEEN_LIMIT:]}, fresh, saturated
 
