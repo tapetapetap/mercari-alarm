@@ -55,7 +55,8 @@ Phase 0. Technical Context의 미정 사항을 정리한다. 메르카리 조회
 ## R5. 관리 화면 서버
 
 - **Decision**: 표준 라이브러리 `http.server.ThreadingHTTPServer`를 조회 루프와 같은 프로세스의 별도 스레드로 띄운다.
-  `0.0.0.0:<PORT>`(기본 8787)에서 듣고, 접근 제한은 네트워크로 한다: 공유기 포트포워딩 없음 + Windows 방화벽은 "개인" 프로필만 허용.
+  `0.0.0.0:<PORT>`(기본 8787)에서 듣고, 접근 제한은 네트워크로 한다: 공유기 포트포워딩 없음 + Windows 방화벽 포트 규칙으로 LAN(`LocalSubnet`)·Tailscale(`100.64.0.0/10`)만 허용
+  (프로그램별 허용 창은 SYSTEM으로 도는 `pythonw.exe`에 적용되지 않으므로 포트 규칙을 쓴다 — quickstart §2).
   Tailscale IP(100.x)와 집 LAN에서 접속된다.
 - **CSRF 완화**: POST는 `Content-Type: application/json`만 받는다. 브라우저의 다른 사이트 요청은 CORS preflight가 필요한데
   서버가 응답하지 않으므로 막힌다. DELETE도 preflight 대상이다.
