@@ -9,7 +9,7 @@ description: "Task list template for feature implementation"
 
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification. Exception: constitution principle VI requires at least one runnable `unittest` for branching core logic (new-item detection, first-run silence, batching, failure alerting, keyword add/delete).
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
