@@ -63,7 +63,7 @@ tailscale ip -4      # 다른 PowerShell 창에서: PC의 Tailscale IP(100.x.x.x
 | 폰 접속 | 폰(Tailscale 켬, 와이파이 끔) 브라우저 `http://<PC의 Tailscale IP>:8787` | 같은 화면 |
 | 키워드 추가 | 폰에서 `ポケモンカード` 추가 | 목록에 즉시 표시, `keywords.txt`에 한 줄 추가 |
 | 첫 조회 무알림 | 1~2분 대기 | 알림 없음, `state.json`에 키워드와 `seen` 생성 |
-| 새 상품 알림 | 넓은 키워드라 몇 분 안에 새 상품이 올라옴 | 폰에 "제목=키워드, 본문=번역 상품명·가격·(원문)" 푸시, 누르면 상품 페이지 |
+| 새 상품 알림 | 넓은 키워드라 몇 분 안에 새 상품이 올라옴 | 폰에 "제목=키워드, 본문=번역 상품명·가격·(원문)" 푸시, 누르면 상품 페이지. 번역이 실패하면(구글 번역 제한 등) 원문·가격 두 줄로 온다 |
 | 삭제 | 폰에서 삭제 | 목록·`keywords.txt`·`state.json`에서 사라지고 이후 알림 없음 |
 | 입력 검증 | 빈 값, 51자, 중복 추가 | 추가 안 되고 이유 표시 |
 | 고장 감지 | PC 네트워크를 11분 끊었다 다시 연결 | 재연결 후 1분 안에 "알림기 조회 실패 중" 푸시 한 번 |
@@ -105,6 +105,7 @@ Start-ScheduledTask -TaskName "mercari-alarm"
 
   ```powershell
   cd C:\mercari-alarm; git pull
+  py -m pip install -r requirements.txt   # 의존성이 바뀌었을 때를 대비해 매번
   Stop-ScheduledTask mercari-alarm; Start-ScheduledTask mercari-alarm
   ```
 

@@ -44,7 +44,7 @@
 
 **Goal**: `keywords.txt`에 적힌 키워드의 새 상품을 1분 주기로 폰에 푸시.
 
-**Independent Test**: `keywords.txt`에 넓은 키워드 하나를 넣고 `py alarm.py` 실행 → 첫 조회 무알림, 이후 새 상품 푸시, 누르면 상품 페이지 (quickstart §3).
+**Independent Test**: `keywords.txt`에 넓은 키워드 하나를 넣고 `py alarm.py` 실행 → 첫 조회 무알림, 이후 새 상품 푸시, 누르면 상품 페이지 (quickstart §4).
 
 ### Tests for User Story 1
 
@@ -75,7 +75,7 @@
 
 **Goal**: 폰 홈 화면 아이콘으로 키워드 목록·추가·삭제.
 
-**Independent Test**: quickstart §3 "관리 화면~입력 검증" 행, §4 홈 화면 추가.
+**Independent Test**: quickstart §4 "관리 화면~입력 검증" 행, §5 홈 화면 추가.
 
 ### Tests for User Story 2
 
@@ -103,7 +103,7 @@
 
 **Goal**: 10분 연속 조회 실패 시 경고 푸시 1회, 복구 시 초기화.
 
-**Independent Test**: quickstart §3 "고장 감지" 행.
+**Independent Test**: quickstart §4 "고장 감지" 행.
 
 ### Tests for User Story 3
 
@@ -125,7 +125,7 @@
 - [X] T021 [P] `README.md`에 한 문단 소개 + quickstart 링크(`specs/001-keyword-alarm/quickstart.md`)와 "넓은 키워드는 놓칠 수 있음" 주의
 - [X] T022 `py -m unittest -v` 전체 통과 확인
 - [X] T023 macOS에서 수동 스모크: 임시 `.env`(테스트 토픽)로 `python3 alarm.py` 실행, 관리 화면에서 키워드 추가 → 첫 조회 무알림 →
-  ntfy 수신 확인 (quickstart §3 일부). Windows 전용 단계(§5 작업 스케줄러)는 사용자가 PC에서 수행
+  ntfy 수신 확인 (quickstart §4 일부). Windows 전용 단계(§6 작업 스케줄러)는 사용자가 PC에서 수행
 
 ---
 
