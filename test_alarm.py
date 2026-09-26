@@ -50,10 +50,25 @@ class DecideTest(unittest.TestCase):
         # 개별 5건 + 묶음 3건은 run 쪽에서 fresh[:BURST] / fresh[BURST:]로 나눈다
         self.assertEqual(len(fresh[alarm.BURST:]), 3)
 
-    def test_all_unseen_means_window_saturated(self):
+    def test_full_window_of_unseen_means_saturated(self):
+        st = {"since": NOW, "seen": ["x"]}
+        full = [item(str(n)) for n in range(alarm.mercari.PAGE_SIZE - 5)]
+        _, _, saturated = alarm.decide(st, full, NOW + 60)
+        self.assertTrue(saturated)
+        _, _, saturated = alarm.decide(st, full + [item("x")], NOW + 60)
+        self.assertFalse(saturated)
+
+    def test_few_unseen_results_are_not_saturated(self):
         st = {"since": NOW, "seen": ["x"]}
         _, _, saturated = alarm.decide(st, [item("a"), item("b")], NOW + 60)
-        self.assertTrue(saturated)
+        self.assertFalse(saturated)
+
+    def test_item_still_in_window_is_not_forgotten(self):
+        # 오래 기억한 A가 아직 목록에 뜨면 뒤로 옮겨져, 이후 ID가 쌓여도 잘리지 않는다
+        st = {"since": NOW, "seen": ["A"] + [str(n) for n in range(alarm.SEEN_LIMIT - 1)]}
+        state, _, _ = alarm.decide(st, [item("A", NOW + 10), item("old", NOW - 86400)], NOW + 60)
+        self.assertEqual(state["seen"][-2:], ["A", "old"])
+        self.assertEqual(len(state["seen"]), alarm.SEEN_LIMIT)
 
     def test_seen_is_trimmed_to_limit(self):
         st = {"since": NOW, "seen": [str(n) for n in range(alarm.SEEN_LIMIT)]}
@@ -100,6 +115,11 @@ class KeywordTest(unittest.TestCase):
             alarm.validate_keyword("ポケカ", ["ポケカ"])
         self.assertEqual(alarm.validate_keyword("ﾎﾟｹｶ", ["ポケカ"]), "ﾎﾟｹｶ")
 
+    def test_validate_rejects_line_breaks(self):
+        for bad in ["ポケカ\nスイッチ", "ポケカ\u2028スイッチ", "ポケカ\x0bスイッチ"]:
+            with self.assertRaisesRegex(ValueError, "줄바꿈"):
+                alarm.validate_keyword(bad, [])
+
     def test_validate_rejects_over_limit(self):
         existing = [str(n) for n in range(alarm.MAX_KEYWORDS)]
         with self.assertRaisesRegex(ValueError, "최대 20개"):
@@ -141,7 +161,7 @@ class HostCheckTest(unittest.TestCase):
             self.assertTrue(alarm.host_allowed(host), host)
 
     def test_rejects_other_domains(self):
-        for host in ["evil.example.com", "evil.example.com:8787", ""]:
+        for host in ["evil.example.com", "evil.example.com:8787", "", "evil.example.com@localhost", "[abc"]:
             self.assertFalse(alarm.host_allowed(host), host)
 
 

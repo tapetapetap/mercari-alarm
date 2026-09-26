@@ -33,6 +33,7 @@ FAIL_ALERT_SEC = 600   # 연속 실패 경고 기준
 CLOCK_SLACK = 60       # PC·메르카리 시계 차이 여유(초)
 
 log = logging.getLogger("alarm")
+_warned = set()  # keywords.txt 무시 경고는 줄마다 한 번만 (매분 반복 방지)
 # ponytail: 파일 두 개를 전역 락 하나로 보호. 요청이 분당 몇 번이라 충분하다.
 lock = threading.Lock()
 
@@ -59,6 +60,8 @@ def validate_keyword(raw, existing):
     k = raw.strip()
     if not 1 <= len(k) <= MAX_LEN:
         raise ValueError(f"키워드는 1~{MAX_LEN}자여야 합니다")
+    if k.splitlines() != [k]:  # 줄바꿈이 섞이면 keywords.txt에서 여러 키워드로 쪼개진다
+        raise ValueError("키워드에 줄바꿈을 넣을 수 없습니다")
     if k in existing:
         raise ValueError("이미 등록된 키워드입니다")
     if len(existing) >= MAX_KEYWORDS:
@@ -79,7 +82,9 @@ def load_keywords():
         try:
             keywords.append(validate_keyword(line, keywords))
         except ValueError as e:
-            log.warning("keywords.txt 줄 무시 %r: %s", line, e)
+            if line not in _warned:
+                _warned.add(line)
+                log.warning("keywords.txt 줄 무시 %r: %s", line, e)
     return keywords
 
 
@@ -126,12 +131,19 @@ def decide(state, items, now):
     if state is None:  # 첫 조회: 이미 있던 상품은 알리지 않고 기억만
         return {"since": now, "seen": [i.id for i in items][-SEEN_LIMIT:]}, [], False
     seen = set(state["seen"])
-    unseen = [i for i in items if i.id not in seen]
-    # 신상품순은 실제로 "최근 수정순"이라 가격 수정된 옛 상품도 올라온다 → 등록 시각으로 거른다
-    fresh = [i for i in unseen if i.created >= state["since"] - CLOCK_SLACK]
-    bumped = [i.id for i in unseen if i not in fresh]
-    saturated = bool(items) and len(unseen) == len(items)
-    return {"since": state["since"], "seen": (state["seen"] + bumped)[-SEEN_LIMIT:]}, fresh, saturated
+    fresh, known = [], []
+    for i in items:
+        # 신상품순은 실제로 "최근 수정순"이라 가격 수정된 옛 상품도 올라온다 → 등록 시각으로 거른다
+        if i.id not in seen and i.created >= state["since"] - CLOCK_SLACK:
+            fresh.append(i)
+        else:
+            known.append(i.id)
+    window = {i.id for i in items}
+    # 이번 결과에 보인 ID는 뒤로 옮긴다. 앞에서부터 잘리므로, 아직 목록에 뜨는 상품을 잊어 중복 알림하는 일을 막는다
+    kept = [x for x in state["seen"] if x not in window] + known
+    # ponytail: 요청 120개 중 몇 개는 빠져서 온다(실측 114~118). 창이 거의 찼는데 아는 상품이 하나도 없으면 포화로 본다
+    saturated = len(items) >= mercari.PAGE_SIZE - 20 and not (seen & window)
+    return {"since": state["since"], "seen": kept[-SEEN_LIMIT:]}, fresh, saturated
 
 
 class FailureWatch:
@@ -195,7 +207,8 @@ def notify(title, message, click=None):
 def check_keyword(keyword, now):
     items = mercari.search(keyword)  # 실패는 예외로 호출자에게 (고장 감지)
     with lock:
-        state, fresh, saturated = decide(load_state().get(keyword), items, now)
+        prev = load_state().get(keyword)
+    state, fresh, saturated = decide(prev, items, now)
     if saturated:
         log.warning("조회 창 포화 %r: 120건이 전부 처음 보는 상품이라 놓친 상품이 있을 수 있음", keyword)
 
@@ -216,11 +229,14 @@ def check_keyword(keyword, now):
     if fresh:
         log.info("%r 새 상품 %d건, 알림 성공 %d건", keyword, len(fresh), len(sent))
 
+    state["seen"] = (state["seen"] + sent)[-SEEN_LIMIT:]
+    if state == prev:
+        return  # 바뀐 게 없으면 쓰지 않는다
     with lock:
-        if keyword not in load_keywords():  # 조회 중에 삭제됨
-            return
         all_state = load_state()
-        state["seen"] = (state["seen"] + sent)[-SEEN_LIMIT:]
+        # 조회·알림 중에 삭제(또는 삭제 후 재등록)됐으면 옛 state로 덮어쓰지 않는다 → 다음 주기에 새로 시작
+        if keyword not in load_keywords() or all_state.get(keyword) != prev:
+            return
         all_state[keyword] = state
         save_state(all_state)
 
@@ -259,7 +275,12 @@ STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
 
 def host_allowed(host_header):
     """DNS 리바인딩 차단: IP·localhost·점 없는 PC 이름·Tailscale(*.ts.net)만 허용."""
-    host = urllib.parse.urlsplit("//" + host_header).hostname  # 포트·[IPv6] 괄호 제거, 소문자화
+    if "@" in host_header:  # "evil.com@localhost" 같은 값이 localhost로 해석되는 것 차단
+        return False
+    try:
+        host = urllib.parse.urlsplit("//" + host_header).hostname  # 포트·[IPv6] 괄호 제거, 소문자화
+    except ValueError:
+        return False
     if not host:
         return False
     if "." not in host or host.endswith(".ts.net"):
@@ -313,7 +334,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(415)
         try:
             length = int(self.headers.get("Content-Length") or 0)
-            if length > 4096:
+            if not 0 <= length <= 4096:
                 return self._send(413)
             keyword = json.loads(self.rfile.read(length))["keyword"]
             if not isinstance(keyword, str):
