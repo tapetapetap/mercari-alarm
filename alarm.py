@@ -7,6 +7,8 @@ import ipaddress
 import json
 import logging
 import os
+import re
+import socket
 import sys
 import threading
 import time
@@ -31,6 +33,7 @@ SEEN_LIMIT = 500       # 키워드당 기억하는 상품 ID 수 (조회 120개�
 BURST = 5              # 키워드당 개별 알림 상한, 나머지는 "외 N건"
 FAIL_ALERT_SEC = 600   # 연속 실패 경고 기준
 CLOCK_SLACK = 60       # PC·메르카리 시계 차이 여유(초)
+TRANSLATE_BUDGET = 50  # 주기 시작 후 이 시간(초)이 지나면 번역을 건너뛰고 원문으로 보낸다
 
 log = logging.getLogger("alarm")
 _warned = set()  # keywords.txt 무시 경고는 줄마다 한 번만 (매분 반복 방지)
@@ -47,6 +50,7 @@ def load_env(path=BASE / ".env"):
     for line in path.read_text(encoding="utf-8-sig").splitlines():
         key, sep, value = line.partition("=")
         if sep and not key.strip().startswith("#"):
+            value = re.split(r"\s#", value, maxsplit=1)[0]  # 값 뒤 "  # 메모" 제거
             os.environ.setdefault(key.strip(), value.strip())
 
 
@@ -199,23 +203,25 @@ def notify(title, message, click=None):
     server = os.environ.get("NTFY_SERVER") or "https://ntfy.sh"
     req = urllib.request.Request(server.rstrip("/") + "/", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
-    urllib.request.urlopen(req, timeout=10).close()
+    urllib.request.urlopen(req, timeout=5).close()
 
 
 # ---------- 조회 루프 ----------
 
-def check_keyword(keyword, now):
+def check_keyword(keyword, now, deadline=float("inf")):
     items = mercari.search(keyword)  # 실패는 예외로 호출자에게 (고장 감지)
     with lock:
         prev = load_state().get(keyword)
     state, fresh, saturated = decide(prev, items, now)
     if saturated:
-        log.warning("조회 창 포화 %r: 120건이 전부 처음 보는 상품이라 놓친 상품이 있을 수 있음", keyword)
+        log.warning("조회 창 포화 %r: %d건이 전부 처음 보는 상품이라 놓친 상품이 있을 수 있음", keyword, len(items))
 
     sent = []
     for it in fresh[:BURST]:
         try:
-            notify(keyword, item_message(it, translate(it.name)), it.url)
+            # 주기가 늦어지면 번역을 건너뛴다: 알림이 번역 때문에 밀리지 않게 (SC-001)
+            translated = translate(it.name) if time.monotonic() < deadline else None
+            notify(keyword, item_message(it, translated), it.url)
             sent.append(it.id)
         except Exception:
             log.exception("알림 실패 %r %s", keyword, it.id)  # seen에 안 넣음 → 다음 주기 재시도
@@ -242,6 +248,7 @@ def check_keyword(keyword, now):
 
 
 def run_cycle(watch):
+    deadline = time.monotonic() + TRANSLATE_BUDGET
     with lock:
         keywords = load_keywords()
         state = load_state()
@@ -253,7 +260,7 @@ def run_cycle(watch):
         if n:
             time.sleep(GAP)
         try:
-            check_keyword(keyword, int(time.time()))
+            check_keyword(keyword, int(time.time()), deadline)
             watch.ok(time.time())
         except Exception:
             log.exception("조회 실패 %r", keyword)  # 다른 키워드는 계속
@@ -274,7 +281,7 @@ STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
 
 
 def host_allowed(host_header):
-    """DNS 리바인딩 차단: IP·localhost·점 없는 PC 이름·Tailscale(*.ts.net)만 허용."""
+    """DNS 리바인딩 차단: IP·localhost·이 PC 이름(·.local)·Tailscale(*.ts.net)만 허용."""
     if "@" in host_header:  # "evil.com@localhost" 같은 값이 localhost로 해석되는 것 차단
         return False
     try:
@@ -283,7 +290,8 @@ def host_allowed(host_header):
         return False
     if not host:
         return False
-    if "." not in host or host.endswith(".ts.net"):
+    pc = socket.gethostname().lower()
+    if host in ("localhost", pc, pc + ".local") or host.endswith(".ts.net"):
         return True
     try:
         ipaddress.ip_address(host)
@@ -317,7 +325,7 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/api/keywords":
             with lock:
                 keywords = load_keywords()
-            return self._json(200, {"keywords": keywords})
+            return self._json(200, {"keywords": keywords, "max": MAX_KEYWORDS})
         if url.path in STATIC:
             name, ctype = STATIC[url.path]
             return self._send(200, (STATIC_DIR / name).read_bytes(), ctype)
@@ -342,7 +350,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, KeyError, TypeError):
             return self._json(400, {"error": "잘못된 요청입니다"})
         try:
-            return self._json(201, {"keywords": add_keyword(keyword)})
+            return self._json(201, {"keywords": add_keyword(keyword), "max": MAX_KEYWORDS})
         except ValueError as e:
             return self._json(400, {"error": str(e)})
 
@@ -354,7 +362,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404)
         keyword = urllib.parse.parse_qs(url.query).get("keyword", [""])[0]
         try:
-            return self._json(200, {"keywords": remove_keyword(keyword)})
+            return self._json(200, {"keywords": remove_keyword(keyword), "max": MAX_KEYWORDS})
         except KeyError:
             return self._json(404, {"error": "등록되지 않은 키워드입니다"})
 
@@ -373,7 +381,7 @@ def main():
 
     if not os.environ.get("NTFY_TOPIC"):
         log.error(".env에 NTFY_TOPIC이 없습니다 (.env.example 참고)")
-        return
+        sys.exit(1)  # 실패로 끝내야 작업 스케줄러에 '실패'로 보이고 재시작도 된다
     port = int(os.environ.get("PORT") or 8787)
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)  # 포트 충돌이면 여기서 죽고 로그에 남는다
     threading.Thread(target=server.serve_forever, daemon=True).start()

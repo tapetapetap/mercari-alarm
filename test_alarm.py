@@ -1,4 +1,6 @@
 """핵심 분기 로직 테스트 (constitution VI). 네트워크 없이 돈다: py -m unittest -v"""
+import os
+import socket
 import tempfile
 import unittest
 from pathlib import Path
@@ -139,6 +141,15 @@ class KeywordTest(unittest.TestCase):
         self.assertEqual(alarm.load_keywords(), ["ポケカ", "スイッチ"])
 
 
+class LoadEnvTest(unittest.TestCase):
+    def test_inline_comment_and_comment_lines_are_ignored(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / ".env"
+            p.write_text("# 주석\nMA_T1=abc  # 내 토픽\nMA_T2=x#y\nMA_T3=v\t# tab\n", encoding="utf-8")
+            alarm.load_env(p)
+        self.assertEqual((os.environ.pop("MA_T1"), os.environ.pop("MA_T2"), os.environ.pop("MA_T3")), ("abc", "x#y", "v"))
+
+
 class FailureWatchTest(unittest.TestCase):
     def test_alerts_once_after_threshold_and_resets_on_success(self):
         w = alarm.FailureWatch(NOW)
@@ -156,12 +167,14 @@ class FailureWatchTest(unittest.TestCase):
 
 class HostCheckTest(unittest.TestCase):
     def test_allows_ip_localhost_lan_name_and_tailscale(self):
-        for host in ["100.101.102.103:8787", "192.168.0.10", "localhost:8787", "DESKTOP-ABC:8787",
+        pc = socket.gethostname()
+        for host in ["100.101.102.103:8787", "192.168.0.10", "localhost:8787", f"{pc}:8787", f"{pc.upper()}.local",
                      "my-pc.tail1234.ts.net:8787", "[::1]:8787"]:
             self.assertTrue(alarm.host_allowed(host), host)
 
     def test_rejects_other_domains(self):
-        for host in ["evil.example.com", "evil.example.com:8787", "", "evil.example.com@localhost", "[abc"]:
+        for host in ["evil.example.com", "evil.example.com:8787", "", "evil.example.com@localhost", "[abc",
+                     "other-pc", "2130706433"]:
             self.assertFalse(alarm.host_allowed(host), host)
 
 

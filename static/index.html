@@ -51,7 +51,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 
-function render(keywords) {
+function render(keywords, max) {
   const list = $("list");
   list.replaceChildren();
   if (!keywords.length) {
@@ -72,7 +72,7 @@ function render(keywords) {
     li.append(span, del);
     list.append(li);
   }
-  $("count").textContent = keywords.length + " / 20";
+  $("count").textContent = keywords.length + " / " + max;
 }
 
 async function call(method, url, body) {
@@ -85,7 +85,7 @@ async function call(method, url, body) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "요청 실패 (" + res.status + ")");
-    render(data.keywords);
+    render(data.keywords, data.max);
     return true;
   } catch (e) {
     // fetch 자체가 실패하면 TypeError (문구는 브라우저마다 다름: Failed to fetch / Load failed / NetworkError)
