@@ -16,8 +16,8 @@ launchd·caffeinate·실제 잠자기는 quickstart 수동 점검.
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] `.gitignore`에 `.venv/` 추가
-- [ ] T002 [P] `.specify/memory/constitution.md` "대상 환경·기술 제약"의 실행 환경을 macOS(맥북, launchd 에이전트 + `caffeinate -i`,
+- [X] T001 [P] `.gitignore`에 `.venv/` 추가
+- [X] T002 [P] `.specify/memory/constitution.md` "대상 환경·기술 제약"의 실행 환경을 macOS(맥북, launchd 에이전트 + `caffeinate -i`,
   Homebrew 파이썬 venv)로 개정, 잠든 동안 공백은 intent에서 감수함을 명시, v1.0.1 → v1.1.0, Sync Impact Report 갱신
 
 ---

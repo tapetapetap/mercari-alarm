@@ -1,6 +1,7 @@
 <!--
 Sync Impact Report
-- Version: 1.0.0 → 1.0.1 (PATCH: 원칙 VI 필수 테스트 목록에 키워드 입력 검증 명시, 보고서 정정)
+- Version: 1.0.1 → 1.1.0 (MINOR: 실행 환경을 macOS로 변경, 잠자기 공백·접근 제한 명시)
+- Changed sections: 대상 환경·기술 제약, V. 비밀·노출 관리 (intent의 루프백·Tailscale 제한 반영)
 - 1.0.0: (template) → 1.0.0 최초 제정
 - Principles: I. intent.md 우선 / II. 단순함 우선 / III. 조회 계층 분리 /
   IV. 조용한 실패 금지 / V. 비밀·노출 관리 / VI. 핵심 로직 최소 테스트
@@ -61,7 +62,7 @@ Sync Impact Report
 - ntfy 토픽 등 비밀 값은 `.env`에 두고 커밋하지 않는다(MUST NOT commit).
   코드와 문서에는 예시 값만 쓴다.
 - 키워드 관리 웹 UI는 인터넷에 노출하지 않는다. 공유기 포트를 열지 않고
-  Tailscale 사설망·집 LAN으로만 접근한다(MUST).
+  맥북 자신(루프백)·Tailscale 사설망으로만 접근한다(MUST).
 - 웹 UI로 들어오는 키워드 입력은 신뢰하지 않는다. 길이·빈 값을 검증하고,
   화면 출력 시 이스케이프한다(MUST).
 
@@ -79,7 +80,8 @@ Sync Impact Report
 
 ## 대상 환경·기술 제약
 
-- 실행 환경: 집 Windows PC, Python 3 (공식 설치판), 작업 스케줄러로 상시 실행, 창 없이(`pythonw`).
+- 실행 환경: macOS 맥북, Homebrew Python 3 venv, launchd 에이전트 + `caffeinate -i`로 로그인 시 실행.
+- 덮개 닫힘·사용자 잠자기는 막지 않는다. 잠든 동안 알림 공백은 intent에서 감수한다.
 - 개발 환경은 macOS일 수 있으므로 경로는 `pathlib`, 파일은 UTF-8로 명시해 OS 차이를 없앤다.
 - 조회 주기 1분, 키워드 사이 간격을 둔다. 1인 저빈도 원칙을 넘는 조회량을 만들지 않는다.
 - 추가 월 비용 0 — 유료 서비스·클라우드를 도입하지 않는다(intent 변경 없이는).
@@ -100,4 +102,4 @@ Sync Impact Report
 - 준수 확인: plan의 Constitution Check와 PR 리뷰에서 원칙 I~VI 위반 여부를 확인한다.
   위반이 불가피하면 plan의 Complexity Tracking에 근거를 적는다.
 
-**Version**: 1.0.1 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-09-26
+**Version**: 1.1.0 | **Ratified**: 2026-09-26 | **Last Amended**: 2026-10-04
