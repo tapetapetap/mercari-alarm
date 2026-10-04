@@ -79,16 +79,16 @@ US1(상시 실행)은 운영 설정이라 코드가 없고, 맥북에서 돌리�
 
 코드 변경 없음. 절차는 [quickstart.md](./quickstart.md)에 작성 완료.
 
-- [ ] T008 [US1] 개발 맥에서 스모크: 임시 실행 폴더(scratchpad)에 복사 → venv → `caffeinate -i python alarm.py` 실행 →
-  `pmset -g assertions`에 `PreventUserIdleSystemSleep` 확인, `localhost` 관리 화면 200, 와이파이 IP로 접속 403, 테스트 토픽 알림 수신
-- [ ] T009 [P] [US4] `README.md`: 실행 환경을 맥북으로, quickstart 링크를 `specs/002-macos-runtime/quickstart.md`로, Windows는 부록 링크
+- [X] T008 [US1] 개발 맥에서 스모크: 임시 실행 폴더(scratchpad)에 복사 → venv → `caffeinate -i python alarm.py` 실행 →
+  `pmset -g assertions`에 `PreventUserIdleSystemSleep` 확인, `localhost` 관리 화면 200, 와이파이 IP로 접속 403, ntfy 전송 생략(사용자 지시), 키워드 추가 없이 확인
+- [X] T009 [P] [US4] `README.md`: 실행 환경을 맥북으로, quickstart 링크를 `specs/002-macos-runtime/quickstart.md`로, Windows는 부록 링크
 
 ---
 
 ## Phase 6: Polish
 
-- [ ] T010 `.venv/bin/python -m unittest -v` 전체 통과 (개발 폴더에서는 scratchpad venv)
-- [ ] T011 [P] `specs/001-keyword-alarm/quickstart.md` 맨 위에 "현재 실행 환경은 맥북 — 002 quickstart 참조" 한 줄 안내
+- [X] T010 `/tmp/mercari-venv/bin/python -m unittest -v` 전체 통과 (저장소 밖 테스트 venv)
+- [X] T011 [P] `specs/001-keyword-alarm/quickstart.md` 맨 위에 "현재 실행 환경은 맥북 — 002 quickstart 참조" 한 줄 안내
 
 ---
 
