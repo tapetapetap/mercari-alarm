@@ -38,16 +38,16 @@ US1(상시 실행)은 운영 설정이라 코드가 없고, 맥북에서 돌리�
 
 ### Tests for User Story 2
 
-- [ ] T003 [P] [US2] `test_alarm.py`에 `FailureWatch.tick` 테스트: (a) 벽시계·monotonic이 같이 600초 흐름(느린 조회) → 잠든 시간 0,
+- [X] T003 [P] [US2] `test_alarm.py`에 `FailureWatch.tick` 테스트: (a) 벽시계·monotonic이 같이 600초 흐름(느린 조회) → 잠든 시간 0,
   `last_success` 유지, 이후 `should_alert` True, (b) 벽시계 3600초·monotonic 60초(잠자기 3540초) → 반환값 3540,
   `last_success`=깨어난 시각, 직후 `should_alert` False, 그 뒤 600초 실패 시 True, (c) 잠든 시간 59초 → 재설정 안 함,
   (d) 기존 `FailureWatchTest`가 새 생성자 인자로 계속 통과
 
 ### Implementation for User Story 2
 
-- [ ] T004 [US2] `alarm.py`: 상수 `SLEEP_GAP = 60`, `FailureWatch.__init__(self, now, mono=None)`에 `last_wall`/`last_mono` 추가
+- [X] T004 [US2] `alarm.py`: 상수 `SLEEP_GAP = 60`, `FailureWatch.__init__(self, now, mono=None)`에 `last_wall`/`last_mono` 추가
   (`mono` 기본값 `time.monotonic()`), `tick(self, wall, mono) -> float`(data-model 규칙, 잠든 초 반환) — T003 통과
-- [ ] T005 [US2] `alarm.py`의 `run_cycle`: 시작과 경고 판단 직전에 `watch.tick(time.time(), time.monotonic())`,
+- [X] T005 [US2] `alarm.py`의 `run_cycle`: 시작과 경고 판단 직전에 `watch.tick(time.time(), time.monotonic())`,
   `SLEEP_GAP` 이상이면 `log.info("잠자기에서 복귀 (%d분)")`. `main()`의 `FailureWatch(time.time())`는 그대로 동작해야 함
 
 **Checkpoint**: 깨어난 직후 실패해도 경고 없음, 실제 고장은 깨어난 뒤 10분에 경고
