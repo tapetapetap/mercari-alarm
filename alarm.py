@@ -291,9 +291,19 @@ def run_cycle(watch):
 
 # ---------- 관리 웹 ----------
 
+TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
+
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
           "/manifest.json": ("manifest.json", "application/manifest+json"),
           "/icon.png": ("icon.png", "image/png")}
+
+
+def client_allowed(ip):
+    try:
+        address = ipaddress.ip_address(ip)
+        return address.is_loopback or address in TAILSCALE_NET
+    except ValueError:
+        return False
 
 
 def host_allowed(host_header):
@@ -328,7 +338,10 @@ class Handler(BaseHTTPRequestHandler):
         self._send(code, json.dumps(obj, ensure_ascii=False).encode())
 
     def _route(self):
-        """허용된 Host면 경로를 돌려주고, 아니면 403을 보내고 None."""
+        """허용된 접속 IP·Host면 경로를 돌려주고, 아니면 403을 보내고 None."""
+        if not client_allowed(self.client_address[0]):
+            self._send(403)
+            return None
         if not host_allowed(self.headers.get("Host", "")):
             self._send(403)
             return None

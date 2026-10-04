@@ -184,6 +184,16 @@ class FailureWatchTest(unittest.TestCase):
         self.assertTrue(w.should_alert(NOW + 1000 + alarm.FAIL_ALERT_SEC))
 
 
+class ClientCheckTest(unittest.TestCase):
+    def test_allows_loopback_and_tailscale(self):
+        for ip in ["127.0.0.1", "127.255.255.254", "100.64.0.1", "100.127.255.254", "100.101.102.103"]:
+            self.assertTrue(alarm.client_allowed(ip), ip)
+
+    def test_rejects_lan_outside_tailscale_and_invalid(self):
+        for ip in ["192.168.0.10", "10.0.0.5", "100.63.255.255", "100.128.0.1", "8.8.8.8", "invalid", ""]:
+            self.assertFalse(alarm.client_allowed(ip), ip)
+
+
 class HostCheckTest(unittest.TestCase):
     def test_allows_ip_localhost_lan_name_and_tailscale(self):
         pc = socket.gethostname()

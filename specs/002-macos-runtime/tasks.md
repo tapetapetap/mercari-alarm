@@ -62,12 +62,12 @@ US1(상시 실행)은 운영 설정이라 코드가 없고, 맥북에서 돌리�
 
 ### Tests for User Story 3
 
-- [ ] T006 [P] [US3] `test_alarm.py`에 `client_allowed` 테스트: 허용 `127.0.0.1`, `100.64.0.1`, `100.127.255.254`, `100.101.102.103`;
+- [X] T006 [P] [US3] `test_alarm.py`에 `client_allowed` 테스트: 허용 `127.0.0.1`, `100.64.0.1`, `100.127.255.254`, `100.101.102.103`;
   거절 `192.168.0.10`, `10.0.0.5`, `100.63.255.255`, `100.128.0.1`, `8.8.8.8`, 형식 오류 문자열
 
 ### Implementation for User Story 3
 
-- [ ] T007 [US3] `alarm.py`: `TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")`, `client_allowed(ip) -> bool`(루프백 또는 Tailscale,
+- [X] T007 [US3] `alarm.py`: `TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")`, `client_allowed(ip) -> bool`(루프백 또는 Tailscale,
   형식 오류는 False), `Handler._route`에서 Host 검사보다 먼저 `client_allowed(self.client_address[0])` 실패 시 403 — T006 통과
   ([contracts/web-access.md](./contracts/web-access.md))
 
