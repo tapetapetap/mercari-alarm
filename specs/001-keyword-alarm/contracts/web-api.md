@@ -42,6 +42,10 @@
 
 `404` (OPTIONS 등 미지원 메서드는 `501`). CORS 헤더는 보내지 않는다(다른 사이트에서의 요청 차단 목적).
 
+## 접속 IP 제한 (002에서 추가)
+
+요청한 쪽 IP가 루프백 또는 Tailscale(`100.64.0.0/10`)이 아니면 `403` — [002 contract](../../002-macos-runtime/contracts/web-access.md).
+
 ## Host 검사 (DNS 리바인딩 차단)
 
 `Host`가 IP, `localhost`, 이 PC의 호스트 이름(또는 `<이름>.local`), `*.ts.net`이 아니면 모든 요청에 `403`.
