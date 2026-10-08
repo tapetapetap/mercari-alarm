@@ -404,7 +404,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     load_env()
     handlers = [RotatingFileHandler(BASE / "alarm.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8")]
-    if sys.stderr:  # pythonw에는 콘솔이 없다
+    if sys.stderr and sys.stderr.isatty():  # 터미널에서 실행할 때만 (launchd·pythonw는 파일·없음)
         handlers.append(logging.StreamHandler())
     logging.basicConfig(level=logging.INFO, handlers=handlers, format="%(asctime)s %(levelname)s %(message)s")
 
