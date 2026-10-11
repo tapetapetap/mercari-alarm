@@ -12,6 +12,7 @@ import socket
 import sys
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -34,6 +35,8 @@ BURST = 5              # 키워드당 개별 알림 상한, 나머지는 "외 N�
 FAIL_ALERT_SEC = 600   # 연속 실패 경고 기준
 SLEEP_GAP = 60         # 잠자기로 보는 두 시계 차이(초)
 CLOCK_SLACK = 60       # PC·메르카리 시계 차이 여유(초)
+TRANSLATE_COOLDOWN = 3600  # 번역 차단(429)을 받으면 이 시간(초) 동안 번역 요청을 보내지 않는다
+_translate_paused_until = 0.0  # monotonic 기준
 TRANSLATE_BUDGET = 50  # 주기 시작 후 이 시간(초)이 지나면 번역을 건너뛰고 원문으로 보낸다
 
 log = logging.getLogger("alarm")
@@ -181,16 +184,22 @@ class FailureWatch:
 # ---------- 외부 호출 ----------
 
 def translate(text):
-    """일본어 → 한국어. 실패하면 None (알림은 원문으로 계속). research.md R4a."""
-    url = "https://translate.googleapis.com/translate_a/single?" + urllib.parse.urlencode(
-        {"client": "gtx", "sl": "ja", "tl": "ko", "dt": "t", "q": text})
+    """일본어 → 한국어. 실패하면 None (알림은 원문으로 계속). 003 research R1·R2."""
+    global _translate_paused_until
+    if time.monotonic() < _translate_paused_until:
+        return None
+    url = "https://clients5.google.com/translate_a/t?" + urllib.parse.urlencode(
+        {"client": "dict-chrome-ex", "sl": "ja", "tl": "ko", "q": text})
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=5) as res:
-            data = json.load(res)
-        return "".join(seg[0] for seg in data[0] if seg[0]) or None
-    except Exception:
-        log.warning("번역 실패 %r", text, exc_info=True)
+            return json.load(res)[0] or None
+    except Exception as e:
+        if isinstance(e, urllib.error.HTTPError) and e.code == 429:  # 차단: 계속 두드리면 길어진다
+            _translate_paused_until = time.monotonic() + TRANSLATE_COOLDOWN
+            log.warning("번역 차단(429), %d분 동안 원문으로 알림", TRANSLATE_COOLDOWN // 60)
+        else:
+            log.warning("번역 실패 %r", text, exc_info=True)
         return None
 
 
