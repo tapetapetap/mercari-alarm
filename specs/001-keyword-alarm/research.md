@@ -46,6 +46,8 @@ Phase 0. Technical Context의 미정 사항을 정리한다. 메르카리 조회
 
 ## R4a. 상품명 번역
 
+> 2026-10-11: 번역 주소는 [003 research R1](../003-translate-fallback/research.md)로 교체됨 (기존 주소 429 차단).
+
 - **Decision**: `GET https://translate.googleapis.com/translate_a/single?client=gtx&sl=ja&tl=ko&dt=t&q=<상품명>`
   (`urllib.request`, 타임아웃 5초). 응답 `d[0][*][0]`을 이어 붙인 것이 번역문. 실패·형식 이상이면 `None` → 원문만 표시.
 - **확인**(2026-09-26): `ポケモンカード151 BOX シュリンク付き 未開封` → `포켓몬 카드 151 BOX 슈링크 첨부 미개봉`.

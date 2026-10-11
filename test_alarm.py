@@ -1,8 +1,11 @@
 """핵심 분기 로직 테스트 (constitution VI). 네트워크 없이 돈다: py -m unittest -v"""
+import io
 import os
 import socket
 import tempfile
 import unittest
+import urllib.error
+import urllib.parse
 from pathlib import Path
 
 import alarm
@@ -182,6 +185,57 @@ class FailureWatchTest(unittest.TestCase):
         w.ok(NOW + 1000)
         self.assertFalse(w.should_alert(NOW + 1000 + alarm.FAIL_ALERT_SEC - 1))
         self.assertTrue(w.should_alert(NOW + 1000 + alarm.FAIL_ALERT_SEC))
+
+
+class TranslateTest(unittest.TestCase):
+    def setUp(self):
+        self.calls, self.reply = [], b'["\xeb\xb2\x88\xec\x97\xad\xeb\xac\xb8"]'  # ["번역문"]
+        self.now = 1000.0
+        orig = alarm.urllib.request.urlopen, alarm.time.monotonic
+        self.addCleanup(lambda: (setattr(alarm.urllib.request, "urlopen", orig[0]), setattr(alarm.time, "monotonic", orig[1])))
+        alarm.urllib.request.urlopen = self.fake_urlopen
+        alarm.time.monotonic = lambda: self.now
+        alarm._translate_paused_until = 0.0
+
+    def fake_urlopen(self, req, timeout):
+        self.calls.append(req.full_url)
+        if isinstance(self.reply, Exception):
+            raise self.reply
+        return io.BytesIO(self.reply)
+
+    def http_error(self, code):
+        return urllib.error.HTTPError("u", code, "x", {}, None)
+
+    def test_parses_reply_and_builds_url(self):
+        self.assertEqual(alarm.translate("ポケカ"), "번역문")
+        q = urllib.parse.urlsplit(self.calls[0])
+        self.assertEqual(q.hostname, "clients5.google.com")
+        self.assertEqual(urllib.parse.parse_qs(q.query),
+                         {"client": ["dict-chrome-ex"], "sl": ["ja"], "tl": ["ko"], "q": ["ポケカ"]})
+
+    def test_empty_reply_is_none(self):
+        self.reply = b'[""]'
+        self.assertIsNone(alarm.translate("ポケカ"))
+
+    def test_429_pauses_for_cooldown_then_retries(self):
+        self.reply = self.http_error(429)
+        with self.assertLogs(alarm.log, "WARNING") as logs:
+            self.assertIsNone(alarm.translate("a"))
+        self.assertEqual(len(logs.output), 1)
+        with self.assertNoLogs(alarm.log):
+            self.assertIsNone(alarm.translate("b"))
+        self.assertEqual(len(self.calls), 1)
+        self.now += alarm.TRANSLATE_COOLDOWN
+        self.reply = b'["ok"]'
+        self.assertEqual(alarm.translate("c"), "ok")
+        self.assertEqual(len(self.calls), 2)
+
+    def test_other_errors_do_not_pause(self):
+        for err in [TimeoutError(), self.http_error(500)]:
+            self.reply = err
+            with self.assertLogs(alarm.log, "WARNING"):
+                self.assertIsNone(alarm.translate("a"))
+        self.assertEqual(len(self.calls), 2)
 
 
 class ClientCheckTest(unittest.TestCase):
