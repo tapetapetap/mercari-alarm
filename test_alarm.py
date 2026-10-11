@@ -151,6 +151,25 @@ class LoadEnvTest(unittest.TestCase):
 
 
 class FailureWatchTest(unittest.TestCase):
+    def test_slow_query_does_not_reset_failure(self):
+        w = alarm.FailureWatch(NOW, 0)
+        self.assertEqual(w.tick(NOW + 600, 600), 0)
+        self.assertEqual(w.last_success, NOW)
+        self.assertTrue(w.should_alert(NOW + 600))
+
+    def test_sleep_resets_failure_until_ten_minutes_after_wake(self):
+        w = alarm.FailureWatch(NOW, 0)
+        self.assertEqual(w.tick(NOW + 3600, 60), 3540)
+        self.assertEqual(w.last_success, NOW + 3600)
+        self.assertFalse(w.should_alert(NOW + 3600))
+        self.assertTrue(w.should_alert(NOW + 4200))
+        self.assertEqual(w.tick(NOW + 4200, 660), 0)
+
+    def test_short_sleep_does_not_reset_failure(self):
+        w = alarm.FailureWatch(NOW, 0)
+        self.assertEqual(w.tick(NOW + 119, 60), 59)
+        self.assertEqual(w.last_success, NOW)
+
     def test_alerts_once_after_threshold_and_resets_on_success(self):
         w = alarm.FailureWatch(NOW)
         self.assertFalse(w.should_alert(NOW))
@@ -163,6 +182,16 @@ class FailureWatchTest(unittest.TestCase):
         w.ok(NOW + 1000)
         self.assertFalse(w.should_alert(NOW + 1000 + alarm.FAIL_ALERT_SEC - 1))
         self.assertTrue(w.should_alert(NOW + 1000 + alarm.FAIL_ALERT_SEC))
+
+
+class ClientCheckTest(unittest.TestCase):
+    def test_allows_loopback_and_tailscale(self):
+        for ip in ["127.0.0.1", "127.255.255.254", "100.64.0.1", "100.127.255.254", "100.101.102.103"]:
+            self.assertTrue(alarm.client_allowed(ip), ip)
+
+    def test_rejects_lan_outside_tailscale_and_invalid(self):
+        for ip in ["192.168.0.10", "10.0.0.5", "100.63.255.255", "100.128.0.1", "8.8.8.8", "invalid", ""]:
+            self.assertFalse(alarm.client_allowed(ip), ip)
 
 
 class HostCheckTest(unittest.TestCase):

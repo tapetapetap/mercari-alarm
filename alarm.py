@@ -1,7 +1,7 @@
 """메르카리 키워드 신착 알림기 (1단계). 설계: specs/001-keyword-alarm/
 
 한 프로세스에 두 스레드: 1분마다 메르카리를 조회해 ntfy로 푸시하는 루프 + 키워드 관리 웹 서버.
-실행: py alarm.py  (상시 실행은 quickstart §5의 작업 스케줄러)
+실행: .venv/bin/python alarm.py  (상시 실행은 002 quickstart §4의 launchd)
 """
 import ipaddress
 import json
@@ -32,6 +32,7 @@ MAX_LEN = 50
 SEEN_LIMIT = 500       # 키워드당 기억하는 상품 ID 수 (조회 120개의 4배 이상)
 BURST = 5              # 키워드당 개별 알림 상한, 나머지는 "외 N건"
 FAIL_ALERT_SEC = 600   # 연속 실패 경고 기준
+SLEEP_GAP = 60         # 잠자기로 보는 두 시계 차이(초)
 CLOCK_SLACK = 60       # PC·메르카리 시계 차이 여유(초)
 TRANSLATE_BUDGET = 50  # 주기 시작 후 이 시간(초)이 지나면 번역을 건너뛰고 원문으로 보낸다
 
@@ -153,9 +154,18 @@ def decide(state, items, now):
 class FailureWatch:
     """조회가 FAIL_ALERT_SEC 이상 연속 실패하면 한 번 경고, 성공하면 초기화."""
 
-    def __init__(self, now):
+    def __init__(self, now, mono=None):
         self.last_success = now
         self.alerted = False
+        self.last_wall = now
+        self.last_mono = time.monotonic() if mono is None else mono
+
+    def tick(self, wall, mono):
+        slept = (wall - self.last_wall) - (mono - self.last_mono)
+        if slept >= SLEEP_GAP:
+            self.last_success = wall
+        self.last_wall, self.last_mono = wall, mono
+        return slept
 
     def ok(self, now):
         self.last_success = now
@@ -248,6 +258,9 @@ def check_keyword(keyword, now, deadline=float("inf")):
 
 
 def run_cycle(watch):
+    slept = watch.tick(time.time(), time.monotonic())
+    if slept >= SLEEP_GAP:
+        log.info("잠자기에서 복귀 (%d분)", slept // 60)
     deadline = time.monotonic() + TRANSLATE_BUDGET
     with lock:
         keywords = load_keywords()
@@ -264,6 +277,9 @@ def run_cycle(watch):
             watch.ok(time.time())
         except Exception:
             log.exception("조회 실패 %r", keyword)  # 다른 키워드는 계속
+    slept = watch.tick(time.time(), time.monotonic())
+    if slept >= SLEEP_GAP:
+        log.info("잠자기에서 복귀 (%d분)", slept // 60)
     if watch.should_alert(time.time()):
         minutes = int((time.time() - watch.last_success) // 60)
         try:
@@ -275,9 +291,19 @@ def run_cycle(watch):
 
 # ---------- 관리 웹 ----------
 
+TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
+
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
           "/manifest.json": ("manifest.json", "application/manifest+json"),
           "/icon.png": ("icon.png", "image/png")}
+
+
+def client_allowed(ip):
+    try:
+        address = ipaddress.ip_address(ip)
+        return address.is_loopback or address in TAILSCALE_NET
+    except ValueError:
+        return False
 
 
 def host_allowed(host_header):
@@ -312,7 +338,10 @@ class Handler(BaseHTTPRequestHandler):
         self._send(code, json.dumps(obj, ensure_ascii=False).encode())
 
     def _route(self):
-        """허용된 Host면 경로를 돌려주고, 아니면 403을 보내고 None."""
+        """허용된 접속 IP·Host면 경로를 돌려주고, 아니면 403을 보내고 None."""
+        if not client_allowed(self.client_address[0]):
+            self._send(403)
+            return None
         if not host_allowed(self.headers.get("Host", "")):
             self._send(403)
             return None
@@ -375,7 +404,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     load_env()
     handlers = [RotatingFileHandler(BASE / "alarm.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8")]
-    if sys.stderr:  # pythonw에는 콘솔이 없다
+    if sys.stderr and sys.stderr.isatty():  # 터미널에서 실행할 때만 (launchd·pythonw는 파일·없음)
         handlers.append(logging.StreamHandler())
     logging.basicConfig(level=logging.INFO, handlers=handlers, format="%(asctime)s %(levelname)s %(message)s")
 

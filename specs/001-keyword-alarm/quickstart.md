@@ -1,3 +1,5 @@
+> 현재 실행 환경은 맥북 — [002 quickstart](../002-macos-runtime/quickstart.md) 참조.
+
 # Quickstart: 설치와 동작 확인
 
 명령은 모두 **PowerShell** 기준이다. "관리자"라고 적힌 단계만 관리자 권한 PowerShell(시작 메뉴에서 우클릭 → 관리자 권한으로 실행)에서 실행한다.
