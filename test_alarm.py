@@ -196,6 +196,7 @@ class TranslateTest(unittest.TestCase):
         alarm.urllib.request.urlopen = self.fake_urlopen
         alarm.time.monotonic = lambda: self.now
         alarm._translate_paused_until = 0.0
+        self.addCleanup(setattr, alarm, "_translate_paused_until", 0.0)
 
     def fake_urlopen(self, req, timeout):
         self.calls.append(req.full_url)
