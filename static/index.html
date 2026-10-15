@@ -31,7 +31,8 @@
   li { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 14px; border-top: 1px solid var(--line); }
   li:first-child { border-top: 0; }
   li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-  .del { background: transparent; color: var(--muted); }
+  .del, .pause { background: transparent; color: var(--muted); padding: 0 10px; }
+  li.paused span { color: var(--muted); }
   .empty { padding: 16px 14px; color: var(--muted); }
   .count { color: var(--muted); font-size: 13px; margin: 8px 2px 0; text-align: right; }
 </style>
@@ -39,7 +40,7 @@
 <body>
 <main>
   <h1>메르카리 알림</h1>
-  <p class="sub">키워드에 맞는 새 상품이 올라오면 ntfy로 알려 드려요. 추가한 키워드는 그 뒤에 올라온 상품부터 알립니다.</p>
+  <p class="sub">키워드에 맞는 새 상품이 올라오면 ntfy로 알려 드려요. 추가하거나 재개한 키워드는 그 뒤에 올라온 상품부터 알립니다.</p>
   <form id="form">
     <input id="kw" maxlength="50" placeholder="예: ポケモンカード 151 BOX" autocomplete="off" enterkeyhint="done" aria-label="새 키워드">
     <button class="add" type="submit">추가</button>
@@ -51,7 +52,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 
-function render(keywords, max) {
+function render(keywords, max, paused) {
   const list = $("list");
   list.replaceChildren();
   if (!keywords.length) {
@@ -61,15 +62,22 @@ function render(keywords, max) {
     list.append(li);
   }
   for (const k of keywords) {
+    const off = paused.includes(k);
     const li = document.createElement("li");
+    if (off) li.className = "paused";
     const span = document.createElement("span");
-    span.textContent = k;  // textContent만 사용 (FR-013)
+    span.textContent = off ? k + " · 멈춤" : k;  // textContent만 사용 (FR-013)
+    const pause = document.createElement("button");
+    pause.className = "pause";
+    pause.textContent = off ? "재개" : "멈춤";
+    pause.setAttribute("aria-label", k + (off ? " 재개" : " 멈춤"));
+    pause.onclick = () => call("POST", "/api/pause", { keyword: k, paused: !off });
     const del = document.createElement("button");
     del.className = "del";
     del.textContent = "삭제";
     del.setAttribute("aria-label", k + " 삭제");
     del.onclick = () => call("DELETE", "/api/keywords?keyword=" + encodeURIComponent(k));
-    li.append(span, del);
+    li.append(span, pause, del);
     list.append(li);
   }
   $("count").textContent = keywords.length + " / " + max;
@@ -85,7 +93,7 @@ async function call(method, url, body) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "요청 실패 (" + res.status + ")");
-    render(data.keywords, data.max);
+    render(data.keywords, data.max, data.paused);
     return true;
   } catch (e) {
     // fetch 자체가 실패하면 TypeError (문구는 브라우저마다 다름: Failed to fetch / Load failed / NetworkError)

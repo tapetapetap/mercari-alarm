@@ -7,3 +7,4 @@ alarm.log*
 __pycache__/
 !.env.example
 .venv/
+paused.txt
