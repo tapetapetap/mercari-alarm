@@ -52,7 +52,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 
-function render(keywords, max, paused) {
+function render(keywords, max, paused = []) {
   const list = $("list");
   list.replaceChildren();
   if (!keywords.length) {

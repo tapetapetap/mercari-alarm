@@ -148,6 +148,10 @@ def add_keyword(raw):
         keywords = load_keywords()
         keywords.append(validate_keyword(raw, keywords))
         save_keywords(keywords)
+        paused = load_paused()
+        if keywords[-1] in paused:  # 지웠다 다시 추가한 키워드에 남은 옛 멈춤 표시 (save가 다른 옛 줄도 정리)
+            paused.remove(keywords[-1])
+            save_paused(paused)
         return keywords
 
 
@@ -157,11 +161,7 @@ def remove_keyword(keyword):
         if keyword not in keywords:
             raise KeyError(keyword)
         keywords.remove(keyword)
-        paused = load_paused()
-        save_keywords(keywords)
-        if keyword in paused:
-            paused.remove(keyword)
-            save_paused(paused)
+        save_keywords(keywords)  # paused.txt의 옛 줄은 load_paused가 무시, 다시 추가하면 add_keyword가 지움
         state = load_state()
         if state.pop(keyword, None) is not None:
             save_state(state)
@@ -271,6 +271,10 @@ def check_keyword(keyword, now, deadline=float("inf")):
     if saturated:
         log.warning("조회 창 포화 %r: %d건이 전부 처음 보는 상품이라 놓친 상품이 있을 수 있음", keyword, len(items))
 
+    if fresh:
+        with lock:
+            if keyword in load_paused():  # 조회 중에 멈췄으면 보내지 않는다
+                return
     sent = []
     for it in fresh[:BURST]:
         try:

@@ -23,3 +23,9 @@
 
 - **Decision**: `POST /api/pause` `{"keyword": "...", "paused": true|false}` → `200 {"keywords", "paused", "max"}`.
 - **Rationale**: 기존 POST의 JSON·크기 검사를 그대로 탄다(CSRF 대응 동일). 켜고 끄기를 한 엔드포인트로.
+- **보완 (PR #8 리뷰)**: 판정 직후·전송 전에 한 번 더 멈춤 여부를 확인해 보내지 않는다. 남는 틈은 그 확인 뒤 번역·전송 중(최대 5건, 수 초)뿐.
+
+## R5. 메모장으로 지운 키워드의 옛 멈춤 표시
+
+- **Decision**: `add_keyword`가 추가한 키워드를 `paused.txt`에서 지운다(이때 다른 옛 줄도 정리). `remove_keyword`는 `paused.txt`를 건드리지 않는다.
+- **Rationale**: 옛 줄이 문제 되는 순간은 같은 키워드를 다시 추가할 때뿐이다. 한 곳에서 처리하면 웹 삭제·메모장 삭제 둘 다 덮인다.
