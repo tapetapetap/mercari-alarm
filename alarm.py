@@ -24,6 +24,7 @@ import mercari
 BASE = Path(__file__).resolve().parent
 KEYWORDS_FILE = BASE / "keywords.txt"
 STATE_FILE = BASE / "state.json"
+PAUSED_FILE = BASE / "paused.txt"  # 멈춘 키워드, 한 줄에 하나 (004)
 STATIC_DIR = BASE / "static"
 
 INTERVAL = 60          # 조회 주기(초)
@@ -100,6 +101,37 @@ def save_keywords(keywords):
     _write(KEYWORDS_FILE, "".join(k + "\n" for k in keywords))
 
 
+def load_paused():
+    """멈춘 키워드 중 지금 등록된 것만 (keywords.txt 순서)."""
+    try:
+        lines = set(PAUSED_FILE.read_text(encoding="utf-8").splitlines())
+    except FileNotFoundError:
+        return []
+    return [k for k in load_keywords() if k in lines]
+
+
+def save_paused(paused):
+    _write(PAUSED_FILE, "".join(k + "\n" for k in paused))
+
+
+def set_paused(keyword, paused):
+    with lock:
+        if keyword not in load_keywords():
+            raise KeyError(keyword)
+        current = load_paused()
+        if paused and keyword not in current:
+            current.append(keyword)
+            state = load_state()
+            if state.pop(keyword, None) is not None:  # 재개 후 첫 조회가 무알림이 되게 (research R2)
+                save_state(state)
+        elif not paused and keyword in current:
+            current.remove(keyword)
+        else:
+            return current
+        save_paused(current)
+        return current
+
+
 def load_state():
     try:
         return json.loads(STATE_FILE.read_text(encoding="utf-8"))
@@ -116,6 +148,10 @@ def add_keyword(raw):
         keywords = load_keywords()
         keywords.append(validate_keyword(raw, keywords))
         save_keywords(keywords)
+        paused = load_paused()
+        if keywords[-1] in paused:  # 지웠다 다시 추가한 키워드에 남은 옛 멈춤 표시 (save가 다른 옛 줄도 정리)
+            paused.remove(keywords[-1])
+            save_paused(paused)
         return keywords
 
 
@@ -125,7 +161,7 @@ def remove_keyword(keyword):
         if keyword not in keywords:
             raise KeyError(keyword)
         keywords.remove(keyword)
-        save_keywords(keywords)
+        save_keywords(keywords)  # paused.txt의 옛 줄은 load_paused가 무시, 다시 추가하면 add_keyword가 지움
         state = load_state()
         if state.pop(keyword, None) is not None:
             save_state(state)
@@ -235,6 +271,10 @@ def check_keyword(keyword, now, deadline=float("inf")):
     if saturated:
         log.warning("조회 창 포화 %r: %d건이 전부 처음 보는 상품이라 놓친 상품이 있을 수 있음", keyword, len(items))
 
+    if fresh:
+        with lock:
+            if keyword in load_paused():  # 조회 중에 멈췄으면 보내지 않는다
+                return
     sent = []
     for it in fresh[:BURST]:
         try:
@@ -260,7 +300,8 @@ def check_keyword(keyword, now, deadline=float("inf")):
     with lock:
         all_state = load_state()
         # 조회·알림 중에 삭제(또는 삭제 후 재등록)됐으면 옛 state로 덮어쓰지 않는다 → 다음 주기에 새로 시작
-        if keyword not in load_keywords() or all_state.get(keyword) != prev:
+        # 조회 중에 멈췄어도 마찬가지 (research R3)
+        if keyword not in load_keywords() or keyword in load_paused() or all_state.get(keyword) != prev:
             return
         all_state[keyword] = state
         save_state(all_state)
@@ -276,9 +317,11 @@ def run_cycle(watch):
         state = load_state()
         if set(state) - set(keywords):  # 메모장으로 지운 키워드의 기억 정리
             save_state({k: v for k, v in state.items() if k in keywords})
-    if not keywords:
+        paused = load_paused()
+    active = [k for k in keywords if k not in paused]
+    if not active:
         watch.ok(time.time())
-    for n, keyword in enumerate(keywords):
+    for n, keyword in enumerate(active):
         if n:
             time.sleep(GAP)
         try:
@@ -346,6 +389,12 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, code, obj):
         self._send(code, json.dumps(obj, ensure_ascii=False).encode())
 
+    def _keywords(self, code, keywords=None):
+        with lock:
+            keywords = load_keywords() if keywords is None else keywords
+            paused = load_paused()
+        self._json(code, {"keywords": keywords, "paused": paused, "max": MAX_KEYWORDS})
+
     def _route(self):
         """허용된 접속 IP·Host면 경로를 돌려주고, 아니면 403을 보내고 None."""
         if not client_allowed(self.client_address[0]):
@@ -361,9 +410,7 @@ class Handler(BaseHTTPRequestHandler):
         if url is None:
             return
         if url.path == "/api/keywords":
-            with lock:
-                keywords = load_keywords()
-            return self._json(200, {"keywords": keywords, "max": MAX_KEYWORDS})
+            return self._keywords(200)
         if url.path in STATIC:
             name, ctype = STATIC[url.path]
             return self._send(200, (STATIC_DIR / name).read_bytes(), ctype)
@@ -373,7 +420,7 @@ class Handler(BaseHTTPRequestHandler):
         url = self._route()
         if url is None:
             return
-        if url.path != "/api/keywords":
+        if url.path not in ("/api/keywords", "/api/pause"):
             return self._send(404)
         # JSON만 받는다: 다른 사이트의 폼 요청은 CORS preflight가 필요해 여기까지 못 온다
         if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
@@ -382,13 +429,21 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
             if not 0 <= length <= 4096:
                 return self._send(413)
-            keyword = json.loads(self.rfile.read(length))["keyword"]
-            if not isinstance(keyword, str):
+            body = json.loads(self.rfile.read(length))
+            keyword = body["keyword"]
+            paused = body["paused"] if url.path == "/api/pause" else False
+            if not isinstance(keyword, str) or not isinstance(paused, bool):
                 raise TypeError
         except (ValueError, KeyError, TypeError):
             return self._json(400, {"error": "잘못된 요청입니다"})
+        if url.path == "/api/pause":
+            try:
+                set_paused(keyword, paused)
+            except KeyError:
+                return self._json(404, {"error": "등록되지 않은 키워드입니다"})
+            return self._keywords(200)
         try:
-            return self._json(201, {"keywords": add_keyword(keyword), "max": MAX_KEYWORDS})
+            return self._keywords(201, add_keyword(keyword))
         except ValueError as e:
             return self._json(400, {"error": str(e)})
 
@@ -400,7 +455,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404)
         keyword = urllib.parse.parse_qs(url.query).get("keyword", [""])[0]
         try:
-            return self._json(200, {"keywords": remove_keyword(keyword), "max": MAX_KEYWORDS})
+            return self._keywords(200, remove_keyword(keyword))
         except KeyError:
             return self._json(404, {"error": "등록되지 않은 키워드입니다"})
 

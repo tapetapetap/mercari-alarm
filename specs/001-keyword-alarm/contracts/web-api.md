@@ -58,3 +58,5 @@
 - 키워드는 `textContent`로 넣는다(`innerHTML` 금지, FR-013).
 - 폰 폭(360px)에서 가로 스크롤 없음. 버튼 터치 영역 44px 이상.
 - `<link rel="manifest">`, `apple-mobile-web-app-capable`, `apple-touch-icon`으로 홈 화면 추가 지원.
+
+> 004: 모든 키워드 응답에 `paused` 추가, `POST /api/pause` — [004 contract](../../004-keyword-pause/contracts/web-api.md).

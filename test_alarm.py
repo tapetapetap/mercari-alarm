@@ -101,10 +101,9 @@ class KeywordTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         d = Path(tmp.name)
-        self._orig = alarm.KEYWORDS_FILE, alarm.STATE_FILE
-        alarm.KEYWORDS_FILE, alarm.STATE_FILE = d / "keywords.txt", d / "state.json"
-        self.addCleanup(lambda: setattr(alarm, "KEYWORDS_FILE", self._orig[0]))
-        self.addCleanup(lambda: setattr(alarm, "STATE_FILE", self._orig[1]))
+        for name in ["KEYWORDS_FILE", "STATE_FILE", "PAUSED_FILE"]:
+            self.addCleanup(setattr, alarm, name, getattr(alarm, name))
+        alarm.KEYWORDS_FILE, alarm.STATE_FILE, alarm.PAUSED_FILE = d / "keywords.txt", d / "state.json", d / "paused.txt"
 
     def test_validate_strips_whitespace(self):
         self.assertEqual(alarm.validate_keyword("  ポケカ  ", []), "ポケカ")
@@ -142,6 +141,54 @@ class KeywordTest(unittest.TestCase):
     def test_load_skips_invalid_lines_and_bom(self):
         alarm.KEYWORDS_FILE.write_text("﻿ポケカ\n\n  ポケカ \n" + "あ" * 51 + "\nスイッチ\n", encoding="utf-8")
         self.assertEqual(alarm.load_keywords(), ["ポケカ", "スイッチ"])
+
+    def test_pause_and_resume(self):
+        alarm.add_keyword("A")
+        alarm.add_keyword("B")
+        alarm.save_state({"A": {"since": NOW, "seen": []}, "B": {"since": NOW, "seen": []}})
+        self.assertEqual(alarm.set_paused("A", True), ["A"])
+        self.assertEqual(alarm.PAUSED_FILE.read_text(encoding="utf-8"), "A\n")
+        self.assertEqual(list(alarm.load_state()), ["B"])  # 멈추면 기억을 지워 재개 후 첫 조회가 무알림
+        self.assertEqual(alarm.set_paused("A", True), ["A"])
+        self.assertEqual(alarm.set_paused("A", False), [])
+        with self.assertRaises(KeyError):
+            alarm.set_paused("X", True)
+
+    def test_readded_keyword_is_not_paused_and_stale_lines_ignored(self):
+        alarm.add_keyword("A")
+        alarm.set_paused("A", True)
+        alarm.KEYWORDS_FILE.write_text("", encoding="utf-8")  # 메모장으로 지움
+        alarm.add_keyword("A")
+        self.assertEqual(alarm.load_paused(), [])
+        self.assertEqual(alarm.PAUSED_FILE.read_text(encoding="utf-8"), "")
+        alarm.add_keyword("B")
+        alarm.PAUSED_FILE.write_text("gone\nB\n", encoding="utf-8")
+        self.assertEqual(alarm.load_paused(), ["B"])
+
+    def test_paused_keyword_is_not_searched_and_pause_mid_check_keeps_state_empty(self):
+        alarm.add_keyword("A")
+        alarm.add_keyword("B")
+        searched = []
+        def fake_search(k):
+            searched.append(k)
+            if k == "B":
+                alarm.set_paused("B", True)  # 조회 도중에 멈춤
+            return [item("x")]
+        sent = []
+        orig_notify = alarm.notify
+        self.addCleanup(setattr, alarm, "notify", orig_notify)
+        alarm.notify = lambda *a: sent.append(a)
+        orig = alarm.mercari.search, alarm.GAP
+        self.addCleanup(lambda: (setattr(alarm.mercari, "search", orig[0]), setattr(alarm, "GAP", orig[1])))
+        alarm.mercari.search, alarm.GAP = fake_search, 0
+        alarm.set_paused("A", True)
+        alarm.run_cycle(alarm.FailureWatch(NOW))
+        self.assertEqual(searched, ["B"])
+        self.assertEqual(alarm.load_state(), {})
+        # 판정 뒤·전송 전에 멈춘 상태면 보내지 않는다 (기억이 남아 x가 새 상품인 경우)
+        alarm.save_state({"B": {"since": NOW - 600, "seen": []}})
+        alarm.check_keyword("B", NOW)
+        self.assertEqual(sent, [])
 
 
 class LoadEnvTest(unittest.TestCase):
